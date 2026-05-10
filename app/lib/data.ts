@@ -9,19 +9,63 @@ import {
 } from './definitions';
 import { formatCurrency } from './utils';
 
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+let sql: ReturnType<typeof postgres> | undefined;
+
+function getSql() {
+  const postgresUrl = process.env.POSTGRES_URL;
+
+  if (!postgresUrl) {
+    throw new Error(
+      'Missing POSTGRES_URL environment variable.\n\n' +
+      'Please create a .env.local file and add your PostgreSQL connection string:\n' +
+      'POSTGRES_URL=postgresql://user:password@host:5432/database\n\n' +
+      'Get a free PostgreSQL database at:\n' +
+      '- Neon.tech: https://neon.tech\n' +
+      '- Supabase: https://supabase.com\n' +
+      '- Railway: https://railway.app'
+    );
+  }
+
+  if (postgresUrl.startsWith('your_postgresql_connection_string')) {
+    throw new Error(
+      'POSTGRES_URL is set to a placeholder value.\n\n' +
+      'Please replace it with your actual PostgreSQL connection string:\n' +
+      'POSTGRES_URL=postgresql://user:password@host:5432/database\n\n' +
+      'Get a free PostgreSQL database at:\n' +
+      '- Neon.tech: https://neon.tech\n' +
+      '- Supabase: https://supabase.com\n' +
+      '- Railway: https://railway.app'
+    );
+  }
+
+  if (!sql) {
+    try {
+      sql = postgres(postgresUrl, { ssl: 'require' });
+    } catch (error) {
+      throw new Error(
+        `Invalid POSTGRES_URL format.\n\n` +
+        `Error: ${error instanceof Error ? error.message : String(error)}\n\n` +
+        `Expected format:\npostgresql://user:password@host:5432/database\n\n` +
+        `Current value: ${postgresUrl.substring(0, 50)}${postgresUrl.length > 50 ? '...' : ''}`
+      );
+    }
+  }
+
+  return sql;
+}
 
 export async function fetchRevenue() {
   try {
+    const sql = getSql();
     // Artificially delay a response for demo purposes.
     // Don't do this in production :)
 
-    // console.log('Fetching revenue data...');
-    // await new Promise((resolve) => setTimeout(resolve, 3000));
+    console.log('Fetching revenue data...');
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     const data = await sql<Revenue[]>`SELECT * FROM revenue`;
 
-    // console.log('Data fetch completed after 3 seconds.');
+    console.log('Data fetch completed after 3 seconds.');
 
     return data;
   } catch (error) {
@@ -32,6 +76,7 @@ export async function fetchRevenue() {
 
 export async function fetchLatestInvoices() {
   try {
+    const sql = getSql();
     const data = await sql<LatestInvoiceRaw[]>`
       SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
       FROM invoices
@@ -52,6 +97,7 @@ export async function fetchLatestInvoices() {
 
 export async function fetchCardData() {
   try {
+    const sql = getSql();
     // You can probably combine these into a single SQL query
     // However, we are intentionally splitting them to demonstrate
     // how to initialize multiple queries in parallel with JS.
@@ -93,6 +139,7 @@ export async function fetchFilteredInvoices(
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
   try {
+    const sql = getSql();
     const invoices = await sql<InvoicesTable[]>`
       SELECT
         invoices.id,
@@ -123,6 +170,7 @@ export async function fetchFilteredInvoices(
 
 export async function fetchInvoicesPages(query: string) {
   try {
+    const sql = getSql();
     const data = await sql`SELECT COUNT(*)
     FROM invoices
     JOIN customers ON invoices.customer_id = customers.id
@@ -144,6 +192,7 @@ export async function fetchInvoicesPages(query: string) {
 
 export async function fetchInvoiceById(id: string) {
   try {
+    const sql = getSql();
     const data = await sql<InvoiceForm[]>`
       SELECT
         invoices.id,
@@ -169,6 +218,7 @@ export async function fetchInvoiceById(id: string) {
 
 export async function fetchCustomers() {
   try {
+    const sql = getSql();
     const customers = await sql<CustomerField[]>`
       SELECT
         id,
@@ -186,6 +236,7 @@ export async function fetchCustomers() {
 
 export async function fetchFilteredCustomers(query: string) {
   try {
+    const sql = getSql();
     const data = await sql<CustomersTableType[]>`
 		SELECT
 		  customers.id,
